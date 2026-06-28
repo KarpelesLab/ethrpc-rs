@@ -1,4 +1,4 @@
-//! Server list ([`RpcList`]) and fastest-server selection ([`Evaluate`]).
+//! Server list ([`RpcList`]) and fastest-server selection ([`evaluate`](crate::evaluate)).
 
 use std::time::{Duration, Instant};
 
@@ -49,7 +49,7 @@ async fn probe(host: String) -> Result<RPC> {
     Ok(r)
 }
 
-/// How long [`Evaluate`] keeps waiting for additional servers after the first
+/// How long [`evaluate`](crate::evaluate) keeps waiting for additional servers after the first
 /// success, so it doesn't block on the slowest endpoint.
 const SELECTION_GRACE: Duration = Duration::from_millis(200);
 
@@ -58,8 +58,9 @@ const SELECTION_GRACE: Duration = Duration::from_millis(200);
 ///
 /// With a single server, the returned handler is that one [`RPC`] (and an error
 /// is returned if it fails to respond). With multiple servers, the result is an
-/// [`RpcList`] of every server that answered within [`SELECTION_GRACE`] of the
-/// first success (or all that eventually answer, whichever comes first).
+/// [`RpcList`] of every server that answered within a short grace period
+/// (200&nbsp;ms) of the first success (or all that eventually answer, whichever
+/// comes first).
 pub async fn evaluate(servers: &[&str]) -> Result<Box<dyn Handler>> {
     match servers.len() {
         0 => Err(Error::NoAvailableServer),

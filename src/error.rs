@@ -9,7 +9,7 @@ pub type Result<T> = std::result::Result<T, Error>;
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
     /// No servers were provided or none were reachable. Returned by
-    /// [`Evaluate`](crate::Evaluate) and [`RpcList`](crate::RpcList).
+    /// [`evaluate`](crate::evaluate) and [`RpcList`](crate::RpcList).
     #[error("no available server")]
     NoAvailableServer,
 

@@ -149,9 +149,7 @@ async fn read_request(sock: &mut tokio::net::TcpStream) -> Option<Incoming> {
 }
 
 fn find(haystack: &[u8], needle: &[u8]) -> Option<usize> {
-    haystack
-        .windows(needle.len())
-        .position(|w| w == needle)
+    haystack.windows(needle.len()).position(|w| w == needle)
 }
 
 fn reason(status: u16) -> &'static str {

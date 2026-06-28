@@ -48,10 +48,7 @@ async fn no_host_no_override_errors() {
 #[tokio::test]
 async fn basic_auth() {
     let url = serve(|req| {
-        let expected = format!(
-            "Basic {}",
-            base64_std("myuser:mypass")
-        );
+        let expected = format!("Basic {}", base64_std("myuser:mypass"));
         match req.header("Authorization") {
             Some(got) if got == expected => rpc_ok(req, json!("ok")),
             _ => Reply::status(401, b"unauthorized".to_vec()),
@@ -97,7 +94,10 @@ async fn http_error_with_html_body() {
 async fn send_raw_request() {
     let url = serve(|req| rpc_ok(req, json!("0x1"))).await;
     let rpc = RPC::new(url);
-    let res = rpc.send(&Request::new("eth_chainId", vec![])).await.unwrap();
+    let res = rpc
+        .send(&Request::new("eth_chainId", vec![]))
+        .await
+        .unwrap();
     assert_eq!(res, json!("0x1"));
 }
 
@@ -174,7 +174,10 @@ async fn forward_override_local() {
     rpc.set_override("eth_chainId", |_args| Ok(json!("0x1")));
 
     let resp = rpc
-        .forward(&Request::new("eth_chainId", vec![]), &ForwardOptions::default())
+        .forward(
+            &Request::new("eth_chainId", vec![]),
+            &ForwardOptions::default(),
+        )
         .await;
     assert_eq!(resp.status, 200);
     let v: serde_json::Value = serde_json::from_slice(&resp.body).unwrap();
@@ -189,7 +192,10 @@ async fn forward_proxies_node() {
     let rpc = RPC::new(url);
 
     let resp = rpc
-        .forward(&Request::new("eth_blockNumber", vec![]), &ForwardOptions::default())
+        .forward(
+            &Request::new("eth_blockNumber", vec![]),
+            &ForwardOptions::default(),
+        )
         .await;
     assert_eq!(resp.status, 200);
     let v: serde_json::Value = serde_json::from_slice(&resp.body).unwrap();
@@ -206,7 +212,10 @@ async fn forward_no_host_404() {
     use ethrpc_rs::ForwardOptions;
     let rpc = RPC::new("");
     let resp = rpc
-        .forward(&Request::new("eth_blockNumber", vec![]), &ForwardOptions::default())
+        .forward(
+            &Request::new("eth_blockNumber", vec![]),
+            &ForwardOptions::default(),
+        )
         .await;
     assert_eq!(resp.status, 404);
 }

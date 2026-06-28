@@ -73,13 +73,13 @@ impl RPC {
     }
 
     /// Returns how long this endpoint took to answer `eth_blockNumber` during
-    /// [`Evaluate`](crate::Evaluate), or zero if it was never probed.
+    /// [`evaluate`](crate::evaluate), or zero if it was never probed.
     pub fn lag(&self) -> Duration {
         self.lag
     }
 
     /// Returns the latest block number observed during
-    /// [`Evaluate`](crate::Evaluate), or zero if it was never probed.
+    /// [`evaluate`](crate::evaluate), or zero if it was never probed.
     pub fn block(&self) -> u64 {
         self.block
     }
@@ -126,8 +126,8 @@ impl RPC {
         }
 
         let body = serde_json::to_vec(req)?;
-        let mut hreq = aio::Request::post(self.host.clone(), body)
-            .header("Content-Type", "application/json");
+        let mut hreq =
+            aio::Request::post(self.host.clone(), body).header("Content-Type", "application/json");
 
         if !self.username.is_empty() || !self.password.is_empty() {
             let token = base64::engine::general_purpose::STANDARD
@@ -281,8 +281,8 @@ impl RPC {
             Ok(b) => b,
             Err(e) => return internal_error(&e.to_string()),
         };
-        let mut hreq = aio::Request::post(self.host.clone(), enc)
-            .header("Content-Type", "application/json");
+        let mut hreq =
+            aio::Request::post(self.host.clone(), enc).header("Content-Type", "application/json");
         if !self.username.is_empty() || !self.password.is_empty() {
             let token = base64::engine::general_purpose::STANDARD
                 .encode(format!("{}:{}", self.username, self.password));
