@@ -1,0 +1,27 @@
+[package]
+name = "ethrpc-rs"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.88"
+description = "A lightweight async library for making JSON-RPC calls to Ethereum-compatible nodes."
+license = "MIT"
+repository = "https://github.com/KarpelesLab/ethrpc-rs"
+documentation = "https://docs.rs/ethrpc-rs"
+readme = "README.md"
+keywords = ["ethereum", "json-rpc", "evm", "web3", "rpc"]
+categories = ["api-bindings", "web-programming", "cryptography::cryptocurrencies"]
+
+[dependencies]
+async-trait = "0.1.89"
+base64 = "0.22.1"
+futures = "0.3.32"
+num-bigint = "0.4.6"
+num-traits = "0.2.19"
+rsurl = { version = "0.1.3", features = ["tokio-rt", "json"] }
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = { version = "1.0.150", features = ["raw_value"] }
+thiserror = "2.0.18"
+tokio = { version = "1", default-features = false, features = ["time", "macros"] }
+
+[dev-dependencies]
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "io-util", "time"] }
