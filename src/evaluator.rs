@@ -6,13 +6,13 @@ use async_trait::async_trait;
 use futures::stream::{FuturesUnordered, StreamExt};
 use serde_json::Value;
 
-use crate::decode::read_u64;
+use crate::decode::ValueExt;
 use crate::error::{Error, Result};
-use crate::rpc::{Handler, RPC};
+use crate::rpc::{Handler, Rpc};
 
-/// A list of [`RPC`] endpoints that implements [`Handler`] with failover.
+/// A list of [`Rpc`] endpoints that implements [`Handler`] with failover.
 #[derive(Default)]
-pub struct RpcList(pub Vec<RPC>);
+pub struct RpcList(pub Vec<Rpc>);
 
 #[async_trait]
 impl Handler for RpcList {
@@ -41,10 +41,10 @@ impl Handler for RpcList {
 }
 
 /// Probes a single server with `eth_blockNumber`, recording its lag and block.
-async fn probe(host: String) -> Result<RPC> {
-    let mut r = RPC::new(host);
+async fn probe(host: String) -> Result<Rpc> {
+    let mut r = Rpc::new(host);
     let start = Instant::now();
-    let block = read_u64(r.call("eth_blockNumber", vec![]).await)?;
+    let block = r.call("eth_blockNumber", vec![]).await?.to_u64()?;
     r.set_probe(start.elapsed(), block);
     Ok(r)
 }
@@ -56,7 +56,7 @@ const SELECTION_GRACE: Duration = Duration::from_millis(200);
 /// Calls every server with `eth_blockNumber`, measures response time, and
 /// returns a [`Handler`] backed by the servers that responded.
 ///
-/// With a single server, the returned handler is that one [`RPC`] (and an error
+/// With a single server, the returned handler is that one [`Rpc`] (and an error
 /// is returned if it fails to respond). With multiple servers, the result is an
 /// [`RpcList`] of every server that answered within a short grace period
 /// (200&nbsp;ms) of the first success (or all that eventually answer, whichever
@@ -73,7 +73,7 @@ pub async fn evaluate(servers: &[&str]) -> Result<Box<dyn Handler>> {
             let mut futs: FuturesUnordered<_> =
                 servers.iter().map(|s| probe(s.to_string())).collect();
 
-            let mut res: Vec<RPC> = Vec::new();
+            let mut res: Vec<Rpc> = Vec::new();
             let mut last_err: Option<Error> = None;
             // Armed after the first success; once it fires we stop waiting.
             let mut grace = std::pin::pin!(futures::future::OptionFuture::from(None));

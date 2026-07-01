@@ -1,22 +1,79 @@
-//! Decode helpers for RPC results.
+//! Decode helpers for Ethereum RPC results.
 //!
-//! These mirror the Go `ReadUint64` / `ReadBigInt` / `ReadString` / `ReadTo` /
-//! `ReadAs` helpers. Each takes the `Result` of a [`call`](crate::RPC::call) so
-//! it can be chained directly:
+//! Ethereum encodes integer "quantities" as hex strings (e.g. `"0x1b4"`), which
+//! serde won't parse into a number on its own. [`ValueExt`] adds methods to
+//! [`serde_json::Value`] that decode these, so a call result is decoded with
+//! ordinary method syntax and the `?` operator:
 //!
 //! ```no_run
-//! # use ethrpc_rs::{RPC, read_u64};
-//! # async fn ex(rpc: &RPC) -> Result<(), ethrpc_rs::Error> {
-//! let block = read_u64(rpc.call("eth_blockNumber", vec![]).await)?;
+//! use ethrpc_rs::{Rpc, ValueExt};
+//! # async fn ex(rpc: &Rpc) -> Result<(), ethrpc_rs::Error> {
+//! let block = rpc.call("eth_blockNumber", vec![]).await?.to_u64()?;
 //! # let _ = block; Ok(()) }
 //! ```
 
 use num_bigint::BigInt;
 use num_traits::Num;
-use serde::de::DeserializeOwned;
 use serde_json::Value;
 
 use crate::error::{Error, Result};
+
+/// Decoding helpers for Ethereum-encoded [`serde_json::Value`] results.
+///
+/// Implemented for [`serde_json::Value`], so any RPC call result can be decoded
+/// in place: `rpc.call(...).await?.to_u64()?`.
+pub trait ValueExt {
+    /// Decodes an Ethereum quantity as a `u64`. Accepts a hex/decimal JSON
+    /// string (e.g. `"0x1b4"`) or a JSON number.
+    fn to_u64(&self) -> Result<u64>;
+
+    /// Decodes an Ethereum quantity as a [`BigInt`]. Accepts a hex/decimal JSON
+    /// string or a JSON number.
+    fn to_big_int(&self) -> Result<BigInt>;
+
+    /// Returns the value as a string slice, erroring if it is not a JSON string.
+    fn to_str(&self) -> Result<&str>;
+}
+
+impl ValueExt for Value {
+    fn to_u64(&self) -> Result<u64> {
+        match self {
+            Value::String(s) => parse_uint_auto(s),
+            Value::Number(n) => n
+                .as_u64()
+                .ok_or_else(|| Error::Other(format!("value {n} is not a u64"))),
+            other => Err(Error::Other(format!("cannot decode {other} as u64"))),
+        }
+    }
+
+    fn to_big_int(&self) -> Result<BigInt> {
+        match self {
+            Value::String(s) => {
+                let (radix, digits) = split_radix(s);
+                BigInt::from_str_radix(digits, radix)
+                    .map_err(|_| Error::Other("invalid integer value".to_string()))
+            }
+            Value::Number(n) => {
+                if let Some(i) = n.as_i64() {
+                    Ok(BigInt::from(i))
+                } else if let Some(u) = n.as_u64() {
+                    Ok(BigInt::from(u))
+                } else {
+                    // Very large integers that don't fit i64/u64: fall back to
+                    // the decimal text representation.
+                    BigInt::from_str_radix(&n.to_string(), 10)
+                        .map_err(|_| Error::Other("invalid integer value".to_string()))
+                }
+            }
+            other => Err(Error::Other(format!("cannot decode {other} as integer"))),
+        }
+    }
+
+    fn to_str(&self) -> Result<&str> {
+        self.as_str()
+            .ok_or_else(|| Error::Other(format!("cannot decode {self} as string")))
+    }
+}
 
 /// Parses an unsigned integer from a string, auto-detecting the base from a
 /// `0x`/`0o`/`0b` prefix (or leading `0` for octal), mirroring Go's
@@ -44,115 +101,39 @@ fn split_radix(s: &str) -> (u32, &str) {
     (10, s)
 }
 
-/// Decodes the value as a `u64`. Accepts a hex/decimal JSON string (e.g.
-/// `"0x1b4"`) or a JSON number. Propagates an upstream error unchanged.
-pub fn read_u64(v: Result<Value>) -> Result<u64> {
-    let v = v?;
-    match v {
-        Value::String(s) => parse_uint_auto(&s),
-        Value::Number(n) => n
-            .as_u64()
-            .ok_or_else(|| Error::Other(format!("value {n} is not a u64"))),
-        other => Err(Error::Other(format!("cannot decode {other} as u64"))),
-    }
-}
-
-/// Decodes the value as a [`BigInt`]. Accepts a hex/decimal JSON string or a
-/// JSON number. Propagates an upstream error unchanged.
-pub fn read_big_int(v: Result<Value>) -> Result<BigInt> {
-    let v = v?;
-    match v {
-        Value::String(s) => {
-            let (radix, digits) = split_radix(&s);
-            BigInt::from_str_radix(digits, radix)
-                .map_err(|_| Error::Other("invalid integer value".to_string()))
-        }
-        Value::Number(n) => {
-            if let Some(i) = n.as_i64() {
-                Ok(BigInt::from(i))
-            } else if let Some(u) = n.as_u64() {
-                Ok(BigInt::from(u))
-            } else {
-                // Fall back to the decimal text representation for very large
-                // integers that don't fit i64/u64.
-                BigInt::from_str_radix(&n.to_string(), 10)
-                    .map_err(|_| Error::Other("invalid integer value".to_string()))
-            }
-        }
-        other => Err(Error::Other(format!("cannot decode {other} as integer"))),
-    }
-}
-
-/// Decodes the value as a string. Propagates an upstream error unchanged.
-pub fn read_string(v: Result<Value>) -> Result<String> {
-    let v = v?;
-    match v {
-        Value::String(s) => Ok(s),
-        other => Err(Error::Other(format!("cannot decode {other} as string"))),
-    }
-}
-
-/// Deserializes the value into any [`DeserializeOwned`] type `T`. Replaces both
-/// Go's `ReadTo` and `ReadAs`. Propagates an upstream error unchanged.
-pub fn read_as<T: DeserializeOwned>(v: Result<Value>) -> Result<T> {
-    let v = v?;
-    Ok(serde_json::from_value(v)?)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use num_bigint::BigInt;
     use serde_json::json;
 
-    fn ok(v: Value) -> Result<Value> {
-        Ok(v)
-    }
-    fn err() -> Result<Value> {
-        Err(Error::Other("rpc failed".to_string()))
-    }
-
     #[test]
     fn u64_variants() {
-        assert_eq!(read_u64(ok(json!("0x1b4"))).unwrap(), 436);
-        assert_eq!(read_u64(ok(json!("100"))).unwrap(), 100);
-        assert_eq!(read_u64(ok(json!(42))).unwrap(), 42);
-        assert_eq!(read_u64(ok(json!("0x0"))).unwrap(), 0);
-        assert!(read_u64(err()).is_err());
-        assert!(read_u64(ok(json!("notanumber"))).is_err());
-        assert!(read_u64(ok(json!({}))).is_err());
+        assert_eq!(json!("0x1b4").to_u64().unwrap(), 436);
+        assert_eq!(json!("100").to_u64().unwrap(), 100);
+        assert_eq!(json!(42).to_u64().unwrap(), 42);
+        assert_eq!(json!("0x0").to_u64().unwrap(), 0);
+        assert!(json!("notanumber").to_u64().is_err());
+        assert!(json!({}).to_u64().is_err());
     }
 
     #[test]
     fn big_int_variants() {
-        assert_eq!(read_big_int(ok(json!("0x1b4"))).unwrap(), BigInt::from(436));
-        assert_eq!(read_big_int(ok(json!("100"))).unwrap(), BigInt::from(100));
-        assert_eq!(read_big_int(ok(json!(42))).unwrap(), BigInt::from(42));
+        assert_eq!(json!("0x1b4").to_big_int().unwrap(), BigInt::from(436));
+        assert_eq!(json!("100").to_big_int().unwrap(), BigInt::from(100));
+        assert_eq!(json!(42).to_big_int().unwrap(), BigInt::from(42));
         assert_eq!(
-            read_big_int(ok(json!("0xDE0B6B3A7640000"))).unwrap(),
+            json!("0xDE0B6B3A7640000").to_big_int().unwrap(),
             BigInt::from(1_000_000_000_000_000_000u64)
         );
-        assert!(read_big_int(err()).is_err());
-        assert!(read_big_int(ok(json!("notanumber"))).is_err());
+        assert!(json!("notanumber").to_big_int().is_err());
     }
 
     #[test]
-    fn string_variants() {
-        assert_eq!(read_string(ok(json!("hello"))).unwrap(), "hello");
-        assert_eq!(read_string(ok(json!(""))).unwrap(), "");
-        assert_eq!(read_string(ok(json!("0xdead"))).unwrap(), "0xdead");
-        assert!(read_string(err()).is_err());
-        assert!(read_string(ok(json!(123))).is_err());
-    }
-
-    #[test]
-    fn as_struct() {
-        #[derive(serde::Deserialize)]
-        struct Block {
-            number: String,
-        }
-        let got: Block = read_as(ok(json!({"number":"0x1b4"}))).unwrap();
-        assert_eq!(got.number, "0x1b4");
-        assert!(read_as::<String>(err()).is_err());
+    fn str_variants() {
+        assert_eq!(json!("hello").to_str().unwrap(), "hello");
+        assert_eq!(json!("").to_str().unwrap(), "");
+        assert_eq!(json!("0xdead").to_str().unwrap(), "0xdead");
+        assert!(json!(123).to_str().is_err());
     }
 }

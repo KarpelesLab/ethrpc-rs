@@ -30,7 +30,7 @@ pub struct Request {
 
 impl Request {
     /// Builds a new request with positional parameters, fit to use with
-    /// [`RPC::send`](crate::RPC::send). An empty `params` is encoded as `[]`,
+    /// [`Rpc::send`](crate::Rpc::send). An empty `params` is encoded as `[]`,
     /// never `null`.
     pub fn new(method: impl Into<String>, params: Vec<Value>) -> Request {
         Request {

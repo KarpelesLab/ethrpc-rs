@@ -5,11 +5,11 @@
 //! # Quick start
 //!
 //! ```no_run
-//! use ethrpc_rs::{RPC, read_u64};
+//! use ethrpc_rs::{Rpc, ValueExt};
 //!
 //! # async fn ex() -> Result<(), ethrpc_rs::Error> {
-//! let rpc = RPC::new("https://cloudflare-eth.com");
-//! let block = read_u64(rpc.call("eth_blockNumber", vec![]).await)?;
+//! let rpc = Rpc::new("https://cloudflare-eth.com");
+//! let block = rpc.call("eth_blockNumber", vec![]).await?.to_u64()?;
 //! println!("block: {block}");
 //! # Ok(()) }
 //! ```
@@ -27,8 +27,8 @@ mod jsonrpc;
 mod rpc;
 
 pub use api::Api;
-pub use decode::{read_as, read_big_int, read_string, read_u64};
+pub use decode::ValueExt;
 pub use error::{Error, Result};
 pub use evaluator::{evaluate, RpcList};
 pub use jsonrpc::{ErrorObject, Request, Response, ResponseIntf};
-pub use rpc::{ForwardOptions, ForwardResponse, Handler, OverrideFn, RPC};
+pub use rpc::{ForwardOptions, ForwardResponse, Handler, OverrideFn, Rpc};

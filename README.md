@@ -18,12 +18,12 @@ All network methods are `async` and run inside a Tokio runtime.
 ## Quick start
 
 ```rust
-use ethrpc_rs::{RPC, read_u64};
+use ethrpc_rs::{Rpc, ValueExt};
 
 #[tokio::main]
 async fn main() -> Result<(), ethrpc_rs::Error> {
-    let rpc = RPC::new("https://cloudflare-eth.com");
-    let block = read_u64(rpc.call("eth_blockNumber", vec![]).await)?;
+    let rpc = Rpc::new("https://cloudflare-eth.com");
+    let block = rpc.call("eth_blockNumber", vec![]).await?.to_u64()?;
     println!("block: {block}");
     Ok(())
 }
@@ -37,7 +37,7 @@ async fn main() -> Result<(), ethrpc_rs::Error> {
 use serde_json::json;
 
 // Positional arguments
-let balance = read_big_int(rpc.call("eth_getBalance", vec![json!(addr), json!("latest")]).await)?;
+let balance = rpc.call("eth_getBalance", vec![json!(addr), json!("latest")]).await?.to_big_int()?;
 
 // Named arguments
 let mut params = serde_json::Map::new();
@@ -48,27 +48,31 @@ let result = rpc.call_named("eth_call", params).await?;
 
 ### Decode helpers
 
-Decoders wrap the `Result` of a `call`, so they chain directly:
+The [`ValueExt`] trait adds decoding methods to the `serde_json::Value` a call
+returns, so results decode in place with `?` — no hex-string juggling:
 
 ```rust
-let block = read_u64(rpc.call("eth_blockNumber", vec![]).await)?;
-let balance = read_big_int(rpc.call("eth_getBalance", vec![json!(addr), json!("latest")]).await)?;
-let hash = read_string(rpc.call("eth_sendRawTransaction", vec![json!(signed_tx)]).await)?;
+use ethrpc_rs::ValueExt;
+
+let block = rpc.call("eth_blockNumber", vec![]).await?.to_u64()?;
+let balance = rpc.call("eth_getBalance", vec![json!(addr), json!("latest")]).await?.to_big_int()?;
+let hash = rpc.call("eth_sendRawTransaction", vec![json!(signed_tx)]).await?.to_str()?.to_owned();
 
 // Decode into any type implementing serde::Deserialize
-let block: MyBlockType = read_as(rpc.call("eth_getBlockByNumber", vec![json!("0x1b4"), json!(true)]).await)?;
+let block: MyBlockType =
+    rpc.call_as("eth_getBlockByNumber", vec![json!("0x1b4"), json!(true)]).await?;
 ```
 
-### Unmarshal into a target type
+### Deserialize into a target type
 
 ```rust
-let peers: Vec<serde_json::Value> = rpc.to("net_peerCount", vec![]).await?;
+let peers: Vec<serde_json::Value> = rpc.call_as("net_peerCount", vec![]).await?;
 ```
 
 ### Basic authentication
 
 ```rust
-let mut rpc = RPC::new("https://my-node.example.com");
+let mut rpc = Rpc::new("https://my-node.example.com");
 rpc.set_basic_auth("user", "password");
 ```
 
@@ -91,7 +95,7 @@ let handler = ethrpc_rs::evaluate(&[
     "https://node3.example.com",
 ]).await?;
 // handler implements ethrpc_rs::Handler with the best responding servers
-let block = read_u64(handler.call("eth_blockNumber", vec![]).await)?;
+let block = handler.call("eth_blockNumber", vec![]).await?.to_u64()?;
 ```
 
 ### HTTP response forwarding

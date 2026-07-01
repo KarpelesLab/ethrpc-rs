@@ -3,7 +3,7 @@
 use serde::de::DeserializeOwned;
 use serde_json::Value;
 
-use crate::decode::read_u64;
+use crate::decode::ValueExt;
 use crate::error::Result;
 use crate::rpc::Handler;
 
@@ -25,18 +25,24 @@ impl<H: Handler> Api<H> {
         self.handler.call(method, params).await
     }
 
-    /// Performs a call and deserializes the result into `T`.
-    pub async fn to<T: DeserializeOwned>(&self, method: &str, params: Vec<Value>) -> Result<T> {
-        crate::decode::read_as(self.handler.call(method, params).await)
+    /// Performs a call and deserializes the result into `T` via serde.
+    pub async fn call_as<T: DeserializeOwned>(
+        &self,
+        method: &str,
+        params: Vec<Value>,
+    ) -> Result<T> {
+        Ok(serde_json::from_value(
+            self.handler.call(method, params).await?,
+        )?)
     }
 
     /// Returns the current block number from the connected node.
     pub async fn block_number(&self) -> Result<u64> {
-        read_u64(self.handler.call("eth_blockNumber", vec![]).await)
+        self.handler.call("eth_blockNumber", vec![]).await?.to_u64()
     }
 
     /// Returns the chain id of the connected network.
     pub async fn chain_id(&self) -> Result<u64> {
-        read_u64(self.handler.call("eth_chainId", vec![]).await)
+        self.handler.call("eth_chainId", vec![]).await?.to_u64()
     }
 }

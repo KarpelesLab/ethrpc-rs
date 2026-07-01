@@ -1,4 +1,4 @@
-//! The [`RPC`] client and the [`Handler`] trait.
+//! The [`Rpc`] client and the [`Handler`] trait.
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -14,11 +14,11 @@ use crate::error::{Error, Result};
 use crate::jsonrpc::{Request, Response};
 
 /// A locally-handled RPC method. Receives the positional parameters and returns
-/// a JSON value (or an error). Registered with [`RPC::set_override`].
+/// a JSON value (or an error). Registered with [`Rpc::set_override`].
 pub type OverrideFn = Arc<dyn Fn(&[Value]) -> Result<Value> + Send + Sync>;
 
-/// Any backend capable of executing JSON-RPC calls. Implemented by [`RPC`] and
-/// [`RpcList`](crate::RpcList). Mirrors Go's `Handler` interface.
+/// Any backend capable of executing JSON-RPC calls. Implemented by [`Rpc`] and
+/// [`RpcList`](crate::RpcList).
 #[async_trait]
 pub trait Handler: Send + Sync {
     /// Performs a JSON-RPC call with positional parameters.
@@ -28,7 +28,7 @@ pub trait Handler: Send + Sync {
 /// A connection to an Ethereum JSON-RPC endpoint over HTTP, with optional basic
 /// authentication and local method overrides.
 #[derive(Clone, Default)]
-pub struct RPC {
+pub struct Rpc {
     host: String,
     lag: Duration,
     block: u64,
@@ -37,11 +37,11 @@ pub struct RPC {
     overrides: HashMap<String, OverrideFn>,
 }
 
-impl RPC {
+impl Rpc {
     /// Returns a new RPC client targeting the given endpoint. Pass an empty host
     /// to build an override-only handler.
-    pub fn new(host: impl Into<String>) -> RPC {
-        RPC {
+    pub fn new(host: impl Into<String>) -> Rpc {
+        Rpc {
             host: host.into(),
             ..Default::default()
         }
@@ -99,13 +99,13 @@ impl RPC {
         self.send(&Request::with_map(method, params)).await
     }
 
-    /// Performs a request and deserializes the result into `T`.
+    /// Performs a request and deserializes the result into `T` via serde.
     pub async fn call_as<T: DeserializeOwned>(
         &self,
         method: &str,
         params: Vec<Value>,
     ) -> Result<T> {
-        crate::decode::read_as(self.call(method, params).await)
+        Ok(serde_json::from_value(self.call(method, params).await?)?)
     }
 
     /// Sends a raw [`Request`] to the endpoint and returns the raw result value.
@@ -163,17 +163,12 @@ impl RPC {
         }
         Ok(res.result)
     }
-
-    /// Performs a request and deserializes the result into `target` via serde.
-    pub async fn to<T: DeserializeOwned>(&self, method: &str, params: Vec<Value>) -> Result<T> {
-        self.call_as(method, params).await
-    }
 }
 
 #[async_trait]
-impl Handler for RPC {
+impl Handler for Rpc {
     async fn call(&self, method: &str, params: Vec<Value>) -> Result<Value> {
-        RPC::call(self, method, params).await
+        Rpc::call(self, method, params).await
     }
 }
 
@@ -183,7 +178,7 @@ fn snippet(body: &[u8]) -> String {
     String::from_utf8_lossy(&body[..end]).trim().to_string()
 }
 
-/// Options controlling how [`RPC::forward`] builds its response.
+/// Options controlling how [`Rpc::forward`] builds its response.
 #[derive(Debug, Clone, Default)]
 pub struct ForwardOptions {
     /// Pretty-print the JSON body.
@@ -192,7 +187,7 @@ pub struct ForwardOptions {
     pub cache: Option<Duration>,
 }
 
-/// A response produced by [`RPC::forward`], ready to be written to whatever HTTP
+/// A response produced by [`Rpc::forward`], ready to be written to whatever HTTP
 /// framework the caller uses.
 #[derive(Debug, Clone)]
 pub struct ForwardResponse {
@@ -221,7 +216,7 @@ fn is_hop_by_hop(name: &str) -> bool {
     HOP_BY_HOP.iter().any(|h| name.eq_ignore_ascii_case(h))
 }
 
-impl RPC {
+impl Rpc {
     /// Builds the response for a JSON-RPC request suitable for proxying back to
     /// an HTTP client. Overridden methods are executed locally; otherwise the
     /// request is forwarded to the node and its response relayed (with
