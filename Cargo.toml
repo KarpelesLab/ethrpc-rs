@@ -1,6 +1,6 @@
 [package]
 name = "ethrpc-rs"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2021"
 rust-version = "1.88"
 description = "A lightweight async library for making JSON-RPC calls to Ethereum-compatible nodes."
@@ -17,6 +17,7 @@ base64 = "0.22.1"
 futures = "0.3.32"
 num-bigint = "0.4.6"
 num-traits = "0.2.19"
+purecrypto = { version = "0.6.25", default-features = false, features = ["hash"], optional = true }
 rsurl = { version = "0.1.3", features = ["tokio-rt", "json"] }
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = { version = "1.0.150", features = ["raw_value"] }
@@ -25,3 +26,10 @@ tokio = { version = "1", default-features = false, features = ["time", "macros"]
 
 [dev-dependencies]
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "io-util", "time"] }
+
+[features]
+default = ["abi"]
+# Contract-call helpers (ABI encode/decode + keccak selectors). Pulls in
+# purecrypto for Keccak-256. Disable with `default-features = false` for a lean
+# raw-JSON-RPC build.
+abi = ["dep:purecrypto"]

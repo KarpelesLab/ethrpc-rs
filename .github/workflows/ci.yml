@@ -42,6 +42,11 @@ jobs:
       - name: Test
         run: cargo test --all-features
 
+      # Guard the lean build: `abi` (and its purecrypto dependency) must be
+      # optional, so the crate has to compile and pass tests without it.
+      - name: Test (no default features)
+        run: cargo test --no-default-features
+
   msrv:
     name: MSRV (Rust 1.88)
     runs-on: ubuntu-latest

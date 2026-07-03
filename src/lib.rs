@@ -18,6 +18,8 @@
 
 #![warn(missing_docs)]
 
+#[cfg(feature = "abi")]
+pub mod abi;
 mod api;
 pub mod chains;
 mod decode;

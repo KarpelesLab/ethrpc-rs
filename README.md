@@ -98,6 +98,33 @@ let handler = ethrpc_rs::evaluate(&[
 let block = handler.call("eth_blockNumber", vec![]).await?.to_u64()?;
 ```
 
+### Contract calls (ABI)
+
+The `abi` module (on by default) turns a function signature and typed arguments
+into calldata, performs the `eth_call`, and decodes the result — no manual hex
+juggling. It covers the common ABI types (`address`, `uint<M>`, `int<M>`, `bool`,
+`bytes<N>`, dynamic `bytes`/`string`, and arrays of those), which is enough for
+ERC-20/721 reads and most `view` calls:
+
+```rust
+use ethrpc_rs::abi::{eth_call_abi, ParamType, Token};
+
+// balanceOf(address) -> uint256
+let out = eth_call_abi(
+    &rpc,
+    "0xdAC17F958D2ee523a2206206994597C13D831ec7", // USDT
+    "balanceOf(address)",
+    &[Token::address("0x28C6c06298d514Db089934071355E5743bf21d60")?],
+    &[ParamType::Uint(256)],
+).await?;
+let balance = out[0].as_uint().unwrap();
+```
+
+Selectors use Keccak-256 from [`purecrypto`](https://crates.io/crates/purecrypto).
+Disable the whole thing (and that dependency) with `default-features = false` for
+a lean raw-JSON-RPC build. Lower-level `encode`, `decode`, `encode_call`, and
+`function_selector` helpers are exposed too.
+
 ### HTTP response forwarding
 
 Build a JSON-RPC response (running overrides locally or proxying to the node,
@@ -135,6 +162,8 @@ println!("{:?}", eth.explorer_url());                  // Some("https://ethersca
   instead of writing to an `http.ResponseWriter`.
 - Method overrides are closures `Fn(&[Value]) -> Result<Value>` rather than
   reflection-based arbitrary Go functions.
+- The `abi` contract-call helper (`eth_call_abi`) has no Go counterpart — the Go
+  library only exposed raw JSON-RPC.
 
 ## License
 

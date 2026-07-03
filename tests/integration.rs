@@ -165,6 +165,39 @@ async fn evaluate_single_server_failure() {
     assert!(err.is_err());
 }
 
+// ---- abi / contract calls ----
+
+#[cfg(feature = "abi")]
+#[tokio::test]
+async fn eth_call_abi_balance_of() {
+    use ethrpc_rs::abi::{eth_call_abi, ParamType, Token};
+    use num_bigint::BigInt;
+
+    // Mock node: verify the eth_call carries balanceOf's selector, then answer
+    // with an ABI-encoded uint256 of 100.
+    let url = serve(|req| {
+        let v: serde_json::Value = serde_json::from_slice(&req.body).unwrap();
+        let data = v["params"][0]["data"].as_str().unwrap_or("");
+        assert!(data.starts_with("0x70a08231"), "wrong selector: {data}");
+        // 100 == 0x64, left-padded to 32 bytes.
+        let word = format!("0x{:0>64x}", 100);
+        rpc_ok(req, json!(word))
+    })
+    .await;
+
+    let rpc = Rpc::new(url);
+    let out = eth_call_abi(
+        &rpc,
+        "0x0000000000000000000000000000000000000dead",
+        "balanceOf(address)",
+        &[Token::address("0x0000000000000000000000000000000000000001").unwrap()],
+        &[ParamType::Uint(256)],
+    )
+    .await
+    .unwrap();
+    assert_eq!(out[0].as_uint().unwrap(), &BigInt::from(100));
+}
+
 // ---- forward ----
 
 #[tokio::test]
