@@ -17,6 +17,21 @@ use crate::jsonrpc::{Request, Response};
 /// a JSON value (or an error). Registered with [`Rpc::set_override`].
 pub type OverrideFn = Arc<dyn Fn(&[Value]) -> Result<Value> + Send + Sync>;
 
+/// Send an HTTP request through rsurl's runtime-agnostic `aio` layer.
+///
+/// On native targets the request is driven on the Tokio runtime (rsurl's
+/// `tokio-rt` adapter); on `wasm32` it goes through the browser Fetch API,
+/// which takes no runtime handle.
+#[cfg(not(target_arch = "wasm32"))]
+async fn send(req: &aio::Request) -> rsurl::Result<aio::Response> {
+    aio::request(&aio::TokioRuntime, req).await
+}
+
+#[cfg(target_arch = "wasm32")]
+async fn send(req: &aio::Request) -> rsurl::Result<aio::Response> {
+    aio::request(req).await
+}
+
 /// Any backend capable of executing JSON-RPC calls. Implemented by [`Rpc`] and
 /// [`RpcList`](crate::RpcList).
 #[async_trait]
@@ -135,8 +150,7 @@ impl Rpc {
             hreq = hreq.header("Authorization", format!("Basic {token}"));
         }
 
-        let rt = aio::TokioRuntime;
-        let resp = aio::request(&rt, &hreq).await?;
+        let resp = send(&hreq).await?;
         let status = resp.status;
         let body = resp.body;
 
@@ -284,8 +298,7 @@ impl Rpc {
             hreq = hreq.header("Authorization", format!("Basic {token}"));
         }
 
-        let rt = aio::TokioRuntime;
-        let resp = match aio::request(&rt, &hreq).await {
+        let resp = match send(&hreq).await {
             Ok(r) => r,
             Err(e) => return internal_error(&e.to_string()),
         };

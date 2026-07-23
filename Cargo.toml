@@ -18,11 +18,22 @@ futures = "0.3.32"
 num-bigint = "0.4.6"
 num-traits = "0.2.19"
 purecrypto = { version = "0.6.25", default-features = false, features = ["hash"], optional = true }
-rsurl = { version = "0.1.3", features = ["tokio-rt", "json"] }
+rsurl = { version = "0.1.7", features = ["json"] }
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = { version = "1.0.150", features = ["raw_value"] }
 thiserror = "2.0.18"
-tokio = { version = "1", default-features = false, features = ["time", "macros"] }
+web-time = "1.1"
+
+# Native targets drive rsurl (and our grace-period timer) on Tokio via rsurl's
+# `tokio-rt` adapter. We no longer depend on tokio directly — sleeping and
+# racing go through `rsurl::aio` + `futures`, which are runtime-agnostic.
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+rsurl = { version = "0.1.7", features = ["tokio-rt"] }
+
+# On wasm32 requests go through the browser Fetch API (no runtime handle) and
+# the grace-period timer uses the browser's own timer.
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+gloo-timers = { version = "0.3", features = ["futures"] }
 
 [dev-dependencies]
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "io-util", "time"] }
