@@ -9,7 +9,11 @@ pub type Result<T> = std::result::Result<T, Error>;
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
     /// No servers were provided or none were reachable. Returned by
-    /// [`evaluate`](crate::evaluate) and [`RpcList`](crate::RpcList).
+    #[cfg_attr(
+        feature = "rpc",
+        doc = "[`evaluate`](crate::evaluate) and [`RpcList`](crate::RpcList)."
+    )]
+    #[cfg_attr(not(feature = "rpc"), doc = "`evaluate` and `RpcList`.")]
     #[error("no available server")]
     NoAvailableServer,
 
@@ -20,7 +24,8 @@ pub enum Error {
 
     /// A JSON-RPC error object returned by the server. This is a *valid*
     /// response — it is not retried against other servers by
-    /// [`RpcList`](crate::RpcList).
+    #[cfg_attr(feature = "rpc", doc = "[`RpcList`](crate::RpcList).")]
+    #[cfg_attr(not(feature = "rpc"), doc = "`RpcList`.")]
     #[error("{0}")]
     Rpc(ErrorObject),
 
@@ -36,7 +41,9 @@ pub enum Error {
         body: String,
     },
 
-    /// A transport-level failure from the underlying HTTP client.
+    /// A transport-level failure from the underlying HTTP client. Only present
+    /// with the `rpc` feature, which is what brings the HTTP client in.
+    #[cfg(feature = "rpc")]
     #[error("transport error: {0}")]
     Transport(#[from] rsurl::Error),
 

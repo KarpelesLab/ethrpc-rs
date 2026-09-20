@@ -6,11 +6,15 @@
 //! not a full ABI implementation: tuples/structs and nested-array corner cases
 //! are out of scope.
 //!
+//! `eth_call_abi` additionally needs the `rpc` feature (both are on by
+//! default); the encoder/decoder below work without it.
+//!
 //! ```no_run
+//! # #[cfg(feature = "rpc")]
+//! # async fn ex() -> Result<(), ethrpc_rs::Error> {
 //! use ethrpc_rs::{Rpc, abi::{eth_call_abi, ParamType, Token}};
 //! use num_bigint::BigInt;
 //!
-//! # async fn ex() -> Result<(), ethrpc_rs::Error> {
 //! let rpc = Rpc::new("https://cloudflare-eth.com");
 //! // balanceOf(address) -> uint256
 //! let out = eth_call_abi(
@@ -27,10 +31,13 @@
 //! ```
 
 use num_bigint::{BigInt, Sign};
+#[cfg(feature = "rpc")]
 use serde_json::{json, Map, Value};
 
+#[cfg(feature = "rpc")]
 use crate::decode::ValueExt;
 use crate::error::{Error, Result};
+#[cfg(feature = "rpc")]
 use crate::rpc::Handler;
 
 /// A decoded/encodable ABI value. The variant, not a separate type string,
@@ -339,6 +346,7 @@ fn decode_value(ty: &ParamType, data: &[u8], pos: usize) -> Result<Token> {
 /// Performs an `eth_call` against `to` with ABI-encoded `args` and decodes the
 /// return value per `returns`. `signature` is the canonical function signature
 /// used to compute the selector, e.g. `"balanceOf(address)"`.
+#[cfg(feature = "rpc")]
 pub async fn eth_call_abi<H: Handler + ?Sized>(
     handler: &H,
     to: &str,

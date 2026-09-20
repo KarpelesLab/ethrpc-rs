@@ -42,10 +42,18 @@ jobs:
       - name: Test
         run: cargo test --all-features
 
-      # Guard the lean build: `abi` (and its purecrypto dependency) must be
-      # optional, so the crate has to compile and pass tests without it.
+      # Guard the lean builds: every optional feature must really be optional,
+      # so the crate has to compile and pass tests in each combination. Bare
+      # `--no-default-features` is the chain-metadata-only build, which must not
+      # pull in rsurl or the async stack at all.
       - name: Test (no default features)
         run: cargo test --no-default-features
+
+      - name: Test (abi only)
+        run: cargo test --no-default-features --features abi
+
+      - name: Test (rpc only)
+        run: cargo test --no-default-features --features rpc
 
   wasm:
     name: wasm32 build
@@ -68,6 +76,9 @@ jobs:
 
       - name: cargo check --target wasm32-unknown-unknown --all-features
         run: cargo check --target wasm32-unknown-unknown --all-features
+
+      - name: cargo check --target wasm32-unknown-unknown --no-default-features
+        run: cargo check --target wasm32-unknown-unknown --no-default-features
 
   msrv:
     name: MSRV (Rust 1.88)

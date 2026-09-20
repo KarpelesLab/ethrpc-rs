@@ -1,3 +1,6 @@
+//! The client integration suite; the whole file needs the `rpc` feature.
+#![cfg(feature = "rpc")]
+
 mod common;
 
 use std::sync::atomic::{AtomicUsize, Ordering};

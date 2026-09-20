@@ -5,11 +5,14 @@
 //! [`serde_json::Value`] that decode these, so a call result is decoded with
 //! ordinary method syntax and the `?` operator:
 //!
-//! ```no_run
-//! use ethrpc_rs::{Rpc, ValueExt};
-//! # async fn ex(rpc: &Rpc) -> Result<(), ethrpc_rs::Error> {
-//! let block = rpc.call("eth_blockNumber", vec![]).await?.to_u64()?;
-//! # let _ = block; Ok(()) }
+//! ```
+//! use ethrpc_rs::ValueExt;
+//! use serde_json::json;
+//! # fn ex() -> Result<(), ethrpc_rs::Error> {
+//! // `json!("0x1b4")` stands in for what `rpc.call("eth_blockNumber", ..)` returns.
+//! assert_eq!(json!("0x1b4").to_u64()?, 436);
+//! # Ok(()) }
+//! # ex().unwrap();
 //! ```
 
 use num_bigint::BigInt;

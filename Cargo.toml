@@ -12,34 +12,50 @@ keywords = ["ethereum", "json-rpc", "evm", "web3", "rpc"]
 categories = ["api-bindings", "web-programming", "cryptography::cryptocurrencies"]
 
 [dependencies]
-async-trait = "0.1.89"
-base64 = "0.22.1"
-futures = "0.3.32"
+# Everything the networking layer needs is optional and pulled in by `rpc`, so
+# a chain-metadata-only build depends on nothing but serde.
+async-trait = { version = "0.1.89", optional = true }
+base64 = { version = "0.22.1", optional = true }
+futures = { version = "0.3.32", optional = true }
 num-bigint = "0.4.6"
 num-traits = "0.2.19"
 purecrypto = { version = "0.6.25", default-features = false, features = ["hash"], optional = true }
-rsurl = { version = "0.1.7", features = ["json"] }
+rsurl = { version = "0.1.7", features = ["json"], optional = true }
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = { version = "1.0.150", features = ["raw_value"] }
 thiserror = "2.0.18"
-web-time = "1.1"
+web-time = { version = "1.1", optional = true }
 
 # Native targets drive rsurl (and our grace-period timer) on Tokio via rsurl's
 # `tokio-rt` adapter. We no longer depend on tokio directly — sleeping and
 # racing go through `rsurl::aio` + `futures`, which are runtime-agnostic.
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-rsurl = { version = "0.1.7", features = ["tokio-rt"] }
+rsurl = { version = "0.1.7", features = ["tokio-rt"], optional = true }
 
 # On wasm32 requests go through the browser Fetch API (no runtime handle) and
 # the grace-period timer uses the browser's own timer.
 [target.'cfg(target_arch = "wasm32")'.dependencies]
-gloo-timers = { version = "0.3", features = ["futures"] }
+gloo-timers = { version = "0.3", features = ["futures"], optional = true }
 
 [dev-dependencies]
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "io-util", "time"] }
 
 [features]
-default = ["abi"]
+default = ["abi", "rpc"]
+
+# The JSON-RPC client itself: `Rpc`, `Api`, `Handler`, `RpcList`, `evaluate`,
+# and `abi::eth_call_abi`. Disabling it leaves the parts that need no network —
+# `chains`, `ValueExt`, the `abi` codec — and drops rsurl and the rest of the
+# async stack from the dependency tree.
+rpc = [
+    "dep:rsurl",
+    "dep:async-trait",
+    "dep:base64",
+    "dep:futures",
+    "dep:web-time",
+    "dep:gloo-timers",
+]
+
 # Contract-call helpers (ABI encode/decode + keccak selectors). Pulls in
 # purecrypto for Keccak-256. Disable with `default-features = false` for a lean
 # raw-JSON-RPC build.

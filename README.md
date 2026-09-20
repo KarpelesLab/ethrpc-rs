@@ -20,6 +20,24 @@ whose futures are `!Send` — so on that target the `Handler` trait drops its
 `Send`/`Sync` bounds instead of demanding something the browser cannot provide.
 You write the same code either way.
 
+### Cargo features
+
+Both are on by default:
+
+| Feature | What it adds | Cost |
+| --- | --- | --- |
+| `rpc` | The JSON-RPC client — `Rpc`, `Api`, `Handler`, `RpcList`, `evaluate`, `abi::eth_call_abi` | `rsurl` and the async stack |
+| `abi` | The contract-call ABI codec and Keccak-256 selectors | `purecrypto` |
+
+Turning `rpc` off leaves the parts that need no network — `chains`, `ValueExt`,
+and the `abi` encoder/decoder — and drops the HTTP client from the tree
+entirely. For chain metadata alone:
+
+```toml
+[dependencies]
+ethrpc-rs = { version = "0.3", default-features = false }
+```
+
 ## Quick start
 
 ```rust
@@ -126,9 +144,9 @@ let balance = out[0].as_uint().unwrap();
 ```
 
 Selectors use Keccak-256 from [`purecrypto`](https://crates.io/crates/purecrypto).
-Disable the whole thing (and that dependency) with `default-features = false` for
-a lean raw-JSON-RPC build. Lower-level `encode`, `decode`, `encode_call`, and
-`function_selector` helpers are exposed too.
+Drop the `abi` feature (and that dependency) for a lean raw-JSON-RPC build.
+Lower-level `encode`, `decode`, `encode_call`, and `function_selector` helpers
+are exposed too, and work without the `rpc` feature.
 
 ### HTTP response forwarding
 
@@ -148,7 +166,8 @@ let resp = rpc.forward(
 
 ### Chain metadata
 
-The `chains` module provides static metadata for known EVM-compatible chains:
+The `chains` module provides static metadata for known EVM-compatible chains.
+It needs no network, so it is available in a `default-features = false` build:
 
 ```rust
 let eth = ethrpc_rs::chains::get(1).unwrap();          // Ethereum Mainnet

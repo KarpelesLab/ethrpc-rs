@@ -30,8 +30,9 @@ pub struct Request {
 
 impl Request {
     /// Builds a new request with positional parameters, fit to use with
-    /// [`Rpc::send`](crate::Rpc::send). An empty `params` is encoded as `[]`,
-    /// never `null`.
+    #[cfg_attr(feature = "rpc", doc = "[`Rpc::send`](crate::Rpc::send).")]
+    #[cfg_attr(not(feature = "rpc"), doc = "`Rpc::send`.")]
+    /// An empty `params` is encoded as `[]`, never `null`.
     pub fn new(method: impl Into<String>, params: Vec<Value>) -> Request {
         Request {
             jsonrpc: "2.0".to_string(),
@@ -53,7 +54,11 @@ impl Request {
 
     /// Wraps an error into a JSON-RPC response carrying this request's id. If
     /// `e` is itself a JSON-RPC error it is preserved verbatim, otherwise it is
-    /// wrapped with the internal-error code `-32603`.
+    /// wrapped with the internal-error code `-32603`. Only [`Rpc::forward`]
+    /// uses it, hence the `rpc` gate.
+    ///
+    /// [`Rpc::forward`]: crate::Rpc::forward
+    #[cfg(feature = "rpc")]
     pub(crate) fn make_error(&self, e: &crate::Error) -> ResponseIntf {
         let error = match e {
             crate::Error::Rpc(eo) => eo.clone(),
@@ -172,6 +177,7 @@ mod tests {
         assert_eq!(e.to_string(), "jsonrpc error -32601: Method not found");
     }
 
+    #[cfg(feature = "rpc")]
     #[test]
     fn make_error_generic_and_passthrough() {
         let req = Request::new("eth_test", vec![]);
