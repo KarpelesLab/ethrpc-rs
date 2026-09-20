@@ -4,7 +4,6 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
 
-use async_trait::async_trait;
 use base64::Engine;
 use rsurl::aio;
 use serde::de::DeserializeOwned;
@@ -13,9 +12,35 @@ use serde_json::{Map, Value};
 use crate::error::{Error, Result};
 use crate::jsonrpc::{Request, Response};
 
+/// The thread-safety bounds this crate asks of a [`Handler`] and of
+/// [override functions](Rpc::set_override).
+///
+/// On native targets this is `Send + Sync`. On `wasm32` it is an empty bound:
+/// the browser's Fetch API is single-threaded and the futures it hands back
+/// hold `Rc`s, so requiring `Send` would make [`Rpc`] itself unimplementable
+/// there. It is blanket-implemented — you never implement it yourself.
+#[cfg(not(target_arch = "wasm32"))]
+pub trait MaybeSendSync: Send + Sync {}
+#[cfg(not(target_arch = "wasm32"))]
+impl<T: Send + Sync + ?Sized> MaybeSendSync for T {}
+
+/// The thread-safety bounds this crate asks of a [`Handler`] — nothing at all
+/// on `wasm32`, where the browser's futures are `!Send`. See the native
+/// definition for the full story.
+#[cfg(target_arch = "wasm32")]
+pub trait MaybeSendSync {}
+#[cfg(target_arch = "wasm32")]
+impl<T: ?Sized> MaybeSendSync for T {}
+
 /// A locally-handled RPC method. Receives the positional parameters and returns
 /// a JSON value (or an error). Registered with [`Rpc::set_override`].
+#[cfg(not(target_arch = "wasm32"))]
 pub type OverrideFn = Arc<dyn Fn(&[Value]) -> Result<Value> + Send + Sync>;
+
+/// A locally-handled RPC method. Receives the positional parameters and returns
+/// a JSON value (or an error). Registered with [`Rpc::set_override`].
+#[cfg(target_arch = "wasm32")]
+pub type OverrideFn = Arc<dyn Fn(&[Value]) -> Result<Value>>;
 
 /// Send an HTTP request through rsurl's runtime-agnostic `aio` layer.
 ///
@@ -34,8 +59,12 @@ async fn send(req: &aio::Request) -> rsurl::Result<aio::Response> {
 
 /// Any backend capable of executing JSON-RPC calls. Implemented by [`Rpc`] and
 /// [`RpcList`](crate::RpcList).
-#[async_trait]
-pub trait Handler: Send + Sync {
+///
+/// On `wasm32` the returned futures are not required to be `Send`, because the
+/// browser's Fetch futures never are — see [`MaybeSendSync`].
+#[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
+#[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
+pub trait Handler: MaybeSendSync {
     /// Performs a JSON-RPC call with positional parameters.
     async fn call(&self, method: &str, params: Vec<Value>) -> Result<Value>;
 }
@@ -66,7 +95,7 @@ impl Rpc {
     /// node. The function receives the call's positional parameters.
     pub fn set_override<F>(&mut self, method: impl Into<String>, f: F)
     where
-        F: Fn(&[Value]) -> Result<Value> + Send + Sync + 'static,
+        F: Fn(&[Value]) -> Result<Value> + MaybeSendSync + 'static,
     {
         self.overrides.insert(method.into(), Arc::new(f));
     }
@@ -179,7 +208,8 @@ impl Rpc {
     }
 }
 
-#[async_trait]
+#[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
+#[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
 impl Handler for Rpc {
     async fn call(&self, method: &str, params: Vec<Value>) -> Result<Value> {
         Rpc::call(self, method, params).await

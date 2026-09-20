@@ -47,6 +47,28 @@ jobs:
       - name: Test (no default features)
         run: cargo test --no-default-features
 
+  wasm:
+    name: wasm32 build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      # The browser Fetch backend's futures are `!Send` (they hold `Rc`s), so
+      # the `Handler` trait drops its `Send` bounds on wasm32. Nothing in a
+      # native build exercises that path — only compiling for the target does.
+      - name: Install Rust (wasm32 target)
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: wasm
+
+      - name: cargo check --target wasm32-unknown-unknown --all-features
+        run: cargo check --target wasm32-unknown-unknown --all-features
+
   msrv:
     name: MSRV (Rust 1.88)
     runs-on: ubuntu-latest

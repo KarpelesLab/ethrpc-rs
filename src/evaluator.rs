@@ -2,7 +2,6 @@
 
 use std::time::Duration;
 
-use async_trait::async_trait;
 use futures::stream::{FuturesUnordered, StreamExt};
 use serde_json::Value;
 // `web-time` is `std::time` on native and a browser-clock shim on wasm32, where
@@ -17,7 +16,8 @@ use crate::rpc::{Handler, Rpc};
 #[derive(Default)]
 pub struct RpcList(pub Vec<Rpc>);
 
-#[async_trait]
+#[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
+#[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
 impl Handler for RpcList {
     /// Performs a call against the servers in order, failing over to the next on
     /// transport errors. A JSON-RPC error response is returned immediately

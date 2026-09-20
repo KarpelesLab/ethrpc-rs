@@ -5,7 +5,8 @@
 
 A lightweight async Rust library for making JSON-RPC calls to Ethereum-compatible
 nodes. A port of the Go [`ethrpc`](https://github.com/KarpelesLab/ethrpc) library,
-built on the async [`rsurl`](https://crates.io/crates/rsurl) HTTP client and Tokio.
+built on the async [`rsurl`](https://crates.io/crates/rsurl) HTTP client. Runs on
+native targets (Tokio) and in the browser (`wasm32`, Fetch API).
 
 ## Install
 
@@ -13,7 +14,11 @@ built on the async [`rsurl`](https://crates.io/crates/rsurl) HTTP client and Tok
 cargo add ethrpc-rs
 ```
 
-All network methods are `async` and run inside a Tokio runtime.
+All network methods are `async`. On native targets they run inside a Tokio
+runtime; on `wasm32-unknown-unknown` they go through the browser's Fetch API,
+whose futures are `!Send` — so on that target the `Handler` trait drops its
+`Send`/`Sync` bounds instead of demanding something the browser cannot provide.
+You write the same code either way.
 
 ## Quick start
 

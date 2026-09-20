@@ -14,7 +14,10 @@
 //! # Ok(()) }
 //! ```
 //!
-//! All network methods are `async` and must be awaited inside a Tokio runtime.
+//! All network methods are `async`. On native targets they run on Tokio (via
+//! rsurl's adapter); on `wasm32` they go through the browser's Fetch API, whose
+//! futures are `!Send` — so on that target [`Handler`] drops its `Send` bounds
+//! rather than asking for something the browser cannot give.
 
 #![warn(missing_docs)]
 
@@ -33,4 +36,4 @@ pub use decode::ValueExt;
 pub use error::{Error, Result};
 pub use evaluator::{evaluate, RpcList};
 pub use jsonrpc::{ErrorObject, Request, Response, ResponseIntf};
-pub use rpc::{ForwardOptions, ForwardResponse, Handler, OverrideFn, Rpc};
+pub use rpc::{ForwardOptions, ForwardResponse, Handler, MaybeSendSync, OverrideFn, Rpc};
