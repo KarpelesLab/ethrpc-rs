@@ -81,17 +81,23 @@ jobs:
         run: cargo check --target wasm32-unknown-unknown --no-default-features
 
   msrv:
-    name: MSRV (Rust 1.88)
+    name: MSRV (Rust 1.89)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
 
       # Keep this pin in sync with `rust-version` in Cargo.toml. Compiling on
       # the declared minimum guards against accidentally using a std/library or
-      # language feature newer than 1.88 (behavior itself is covered by the
+      # language feature newer than 1.89 (behavior itself is covered by the
       # stable `test` job, so this is compile-only).
-      - name: Install Rust 1.88 (declared MSRV)
-        uses: dtolnay/rust-toolchain@1.88
+      #
+      # Cargo.lock is not committed, so this resolves the newest semver-
+      # compatible dependencies — which is the MSRV a consumer actually gets.
+      # The floor comes from the HTTP stack (rsurl/puressh/purecrypto, all
+      # 1.89); the `rpc`-less build needs far less, but one `rust-version` has
+      # to cover the default feature set.
+      - name: Install Rust 1.89 (declared MSRV)
+        uses: dtolnay/rust-toolchain@1.89
 
       - name: Cache
         uses: Swatinem/rust-cache@v2
